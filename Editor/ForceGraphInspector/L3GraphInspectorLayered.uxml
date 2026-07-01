@@ -25,6 +25,7 @@
                     <ui:VisualElement name="GraphInspector" style="margin-left: 0; transition-property: all; transition-duration: 0.25s; flex-grow: 0; margin-top: 0; margin-right: 0; margin-bottom: 0; flex-shrink: 1;"/>
                     <ui:VisualElement name="SelectionInspector" style="margin-left: 0; transition-property: all; transition-duration: 0.25s; flex-grow: 0; margin-top: 0; margin-right: 0; margin-bottom: 0; flex-shrink: 1;"/>
                 </ui:VisualElement>
+                <ui:VisualElement name="InspectorResizeHandle" class="InspectorResizeHandle" tooltip="Drag to resize the inspector width." style="position: absolute; top: 0; right: 0; bottom: 0; width: 7px;"/>
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="Toolbar" style="flex-grow: 1; position: absolute; height: auto; border-top-width: 0; border-right-width: 0; border-bottom-width: 0; border-left-width: 0; padding-top: 0; padding-right: 0; padding-bottom: 0; padding-left: 0; transition-property: all; transition-duration: 0.25s; overflow: hidden; -unity-background-image-tint-color: rgb(255, 255, 255); background-color: rgba(26, 26, 26, 0); flex-shrink: 0;">

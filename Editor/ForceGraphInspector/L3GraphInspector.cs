@@ -64,6 +64,11 @@ namespace Less3.Graph.Editor
         public static readonly string HEIGHT_SETTING_KEY = "ForceGraphInspectorHeight";
         public static readonly float MIN_GRAPH_HEIGHT = 100f;
 
+        public static readonly string INSPECTOR_WIDTH_SETTING_KEY = "ForceGraphInspectorWidth";
+        public static readonly float DEFAULT_INSPECTOR_WIDTH = 300f;
+        public static readonly float MIN_INSPECTOR_WIDTH = 256f;
+        public static readonly float MAX_INSPECTOR_WIDTH = 900f;
+
         public static readonly string FAST_FORWARD_SETTINGS_KEY = "ForceGraphFastForward";
         public static readonly string FIT_TO_SCREEN_SETTINGS_KEY = "ForceGraphFitToScreen";
         public static readonly string LAYERED_MODE_SETTINGS_KEY = "ForceGraphInspectorLayered";
@@ -289,6 +294,15 @@ namespace Less3.Graph.Editor
             inspectorOverlay = inspector.Q("InspectorOverlay");
             // drag
             inspectorOverlay.AddManipulator(new ForceGraphInspectorOverlayManipulator(inspectorOverlay));
+
+            // width resize: apply the persisted width and let the right-edge handle change it
+            float inspectorWidth = Mathf.Clamp(
+                EditorPrefs.GetFloat(INSPECTOR_WIDTH_SETTING_KEY, DEFAULT_INSPECTOR_WIDTH),
+                MIN_INSPECTOR_WIDTH, MAX_INSPECTOR_WIDTH);
+            inspectorOverlay.style.maxWidth = MAX_INSPECTOR_WIDTH;
+            inspectorOverlay.style.width = inspectorWidth;
+            var inspectorResizeHandle = inspector.Q("InspectorResizeHandle");
+            inspectorResizeHandle.AddManipulator(new ForceGraphInspectorWidthResizeManipulator(inspectorOverlay));
 
             foreach (var node in (target as L3Graph).nodes)
             {
