@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditor.UIElements;
@@ -361,8 +362,22 @@ namespace Less3.Graph.Editor
         {
             if (canvas.selectedNodes.Count > 1)
             {
-                var objects = canvas.selectedNodes.ConvertAll(n => n.data as Object).ToArray();
-                InspectObjects(objects);
+                var objects = canvas.selectedNodes
+                    .ConvertAll(n => n.data as Object)
+                    .Where(o => o != null)
+                    .ToArray();
+                if (objects.Length > 1)
+                {
+                    InspectObjects(objects);
+                }
+                else if (objects.Length == 1)
+                {
+                    InspectObject(objects[0]);
+                }
+                else
+                {
+                    InspectObject(target);
+                }
             }
             else if (canvas.selectedNode != null)
             {
@@ -406,8 +421,15 @@ namespace Less3.Graph.Editor
         private void InspectObjects(Object[] objects)
         {
             DestroyMultiSelectionInspector();
-            selectionInspectorRoot.Clear();
             multiSelectionInspector = UnityEditor.Editor.CreateEditor(objects);
+            if (multiSelectionInspector == null)
+            {
+                // Can happen if the targets don't share a compatible editor (e.g. stale/destroyed reference).
+                InspectObject(target);
+                return;
+            }
+
+            selectionInspectorRoot.Clear();
             selectionInspectorRoot.Add(new InspectorElement(multiSelectionInspector));
             graphInspectorRoot.style.display = DisplayStyle.None;
             selectionInspectorRoot.style.display = DisplayStyle.Flex;

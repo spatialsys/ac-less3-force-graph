@@ -451,9 +451,14 @@ namespace Less3.Graph.Editor
             {
                 DeleteConnectionInternal(connection);
             }
+            bool wasSelected = selectedNodes.Remove(node);
             nodes.Remove(node);
             node.element.RemoveFromHierarchy();
             OnNodeDeletedInternally?.Invoke(node);
+            if (wasSelected)
+            {
+                OnSelectionChanged?.Invoke();
+            }
         }
 
         private void DuplicateNodeInternal(LCanvasNode<N> node)
@@ -471,6 +476,11 @@ namespace Less3.Graph.Editor
             groups.Remove(group);
             group.element.RemoveFromHierarchy();
             OnGroupDeletedInternally?.Invoke(group);
+            if (selectedGroup == group)
+            {
+                selectedGroup = null;
+                OnSelectionChanged?.Invoke();
+            }
         }
 
         private void DeleteConnectionInternal(LCanvasConnection<N, C> connection)
@@ -480,6 +490,11 @@ namespace Less3.Graph.Editor
             connectionLines[index].RemoveFromHierarchy();
             connectionLines.RemoveAt(index);
             OnConnectionDeletedInternally?.Invoke(connection);
+            if (selectedConnection == connection)
+            {
+                selectedConnection = null;
+                OnSelectionChanged?.Invoke();
+            }
         }
 
         private void AddConnectionInternal(LCanvasNode<N> from, LCanvasNode<N> to, Type type)
