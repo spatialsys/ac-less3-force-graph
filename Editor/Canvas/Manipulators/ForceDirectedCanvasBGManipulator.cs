@@ -10,17 +10,20 @@ using UnityEngine.UIElements;
 /// </summary>
 public class ForceDirectedCanvasBGManipulator : PointerManipulator
 {
+    private const float CLICK_DRAG_THRESHOLD = 3f;
+
     private bool _enabled;
     private bool _isLeftDrag;
+    private bool _passedDragThreshold;
     private Vector2 _targetStartPosition { get; set; }
     private Vector3 _pointerStartPosition { get; set; }
 
-    public Action OnLeftClick { get; set; }
+    public Action<bool> OnLeftClick { get; set; }
     public Action<Vector2> OnRightClick { get; set; }
 
     public Action<Vector2> OnLeftDragStart { get; set; }
     public Action<Vector2> OnLeftDrag { get; set; }
-    public Action<Vector2> OnLeftDragEnd { get; set; }
+    public Action<Vector2, bool> OnLeftDragEnd { get; set; }
 
     public Action<Vector2> OnMiddleDrag { get; set; }
     private VisualElement _translationContainer;
@@ -42,10 +45,6 @@ public class ForceDirectedCanvasBGManipulator : PointerManipulator
     {
         _targetStartPosition = target.transform.position;
         _pointerStartPosition = evt.position;
-        if (evt.button == (int)MouseButton.LeftMouse)
-        {
-            OnLeftClick?.Invoke();
-        }
         if (evt.button == (int)MouseButton.RightMouse)
         {
             OnRightClick?.Invoke(evt.position);
@@ -54,6 +53,7 @@ public class ForceDirectedCanvasBGManipulator : PointerManipulator
         if (evt.button == (int)MouseButton.MiddleMouse || evt.button == (int)MouseButton.LeftMouse)
         {
             _enabled = true;
+            _passedDragThreshold = false;
             PointerCaptureHelper.CapturePointer(target, evt.pointerId);
             _isLeftDrag = evt.button == (int)MouseButton.LeftMouse;
             if (_isLeftDrag)
@@ -68,6 +68,10 @@ public class ForceDirectedCanvasBGManipulator : PointerManipulator
     {
         if (_enabled && target.HasPointerCapture(evt.pointerId))
         {
+            if (!_passedDragThreshold && Vector3.Distance(evt.position, _pointerStartPosition) > CLICK_DRAG_THRESHOLD)
+            {
+                _passedDragThreshold = true;
+            }
             if (_isLeftDrag)
             {
                 OnLeftDrag?.Invoke(evt.deltaPosition);
@@ -87,7 +91,14 @@ public class ForceDirectedCanvasBGManipulator : PointerManipulator
             target.ReleasePointer(evt.pointerId);
             if (_isLeftDrag)
             {
-                OnLeftDragEnd?.Invoke(evt.position);
+                if (_passedDragThreshold)
+                {
+                    OnLeftDragEnd?.Invoke(evt.position, evt.shiftKey);
+                }
+                else
+                {
+                    OnLeftClick?.Invoke(evt.shiftKey);
+                }
             }
         }
     }

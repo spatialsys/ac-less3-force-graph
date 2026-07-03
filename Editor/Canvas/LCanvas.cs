@@ -47,13 +47,6 @@ namespace Less3.Graph.Editor
         {
             translationContainer = CreateContainer("TranslationContainer", fullStretch: true);
 
-            dragBox = CreateContainer("DragBox");
-            dragBox.style.backgroundColor = Color.red;
-            dragBox.style.width = 8f;
-            dragBox.style.height = 8f;
-            dragBox.style.opacity = 0f;
-            translationContainer.Add(dragBox);
-
             bg = new VisualElement { name = "BG" };
             bg.style.flexGrow = 1;
 
@@ -70,6 +63,18 @@ namespace Less3.Graph.Editor
             translationContainer.Add(connectionsContainer);
             translationContainer.Add(effectsContainer);
             translationContainer.Add(nodesContainer);
+
+            dragBox = CreateContainer("DragBox");
+            dragBox.style.backgroundColor = new Color(1f, 0.3f, 0.2f, 0.15f);
+            dragBox.style.borderTopWidth = dragBox.style.borderBottomWidth =
+                dragBox.style.borderLeftWidth = dragBox.style.borderRightWidth = 1f;
+            dragBox.style.borderTopColor = dragBox.style.borderBottomColor =
+                dragBox.style.borderLeftColor = dragBox.style.borderRightColor = new Color(1f, 0.3f, 0.2f, 0.6f);
+            dragBox.style.width = 0f;
+            dragBox.style.height = 0f;
+            dragBox.style.opacity = 0f;
+            dragBox.pickingMode = PickingMode.Ignore;
+            nodesContainer.Add(dragBox);
         }
 
         private void InitializeNewConnectionLine()
@@ -88,21 +93,53 @@ namespace Less3.Graph.Editor
             bg.AddManipulator(new ForceDirectedCanvasScrollManipulator(translationContainer));
             bg.AddManipulator(new ForceDirectedCanvasBGManipulator
             {
-                OnLeftClick = () => ClearSelection(true),
+                OnLeftClick = shiftHeld =>
+                {
+                    _leftDragging = false;
+                    dragBox.style.opacity = 0f;
+                    if (!shiftHeld)
+                        ClearSelection(true);
+                },
                 OnRightClick = ShowBackgroundContextMenu,
                 OnMiddleDrag = delta => translationContainer.transform.position += new Vector3(delta.x, delta.y, 0),
                 OnLeftDragStart = pos =>
                 {
                     _leftDragging = true;
-                    _leftDragStartPos = nodesContainer.WorldToLocal(pos);
-                    _leftDragPos = _leftDragStartPos;
+                    _leftDragStartWorldPos = pos;
+                    _leftDragCurrentWorldPos = pos;
+                    dragBox.style.opacity = 1f;
+                    UpdateDragBoxRect();
                 },
-                OnLeftDrag = pos =>
+                OnLeftDrag = delta =>
                 {
-                    _leftDragPos += pos;
-                    dragBox.transform.position = _leftDragPos;
+                    _leftDragCurrentWorldPos += delta;
+                    UpdateDragBoxRect();
+                },
+                OnLeftDragEnd = (pos, shiftHeld) =>
+                {
+                    _leftDragging = false;
+                    dragBox.style.opacity = 0f;
+                    SelectNodesInRect(GetDragLocalRect(), shiftHeld);
                 }
             });
+        }
+
+        private Rect GetDragLocalRect()
+        {
+            Vector2 startLocal = nodesContainer.WorldToLocal(_leftDragStartWorldPos);
+            Vector2 currentLocal = nodesContainer.WorldToLocal(_leftDragCurrentWorldPos);
+            return Rect.MinMaxRect(
+                Mathf.Min(startLocal.x, currentLocal.x), Mathf.Min(startLocal.y, currentLocal.y),
+                Mathf.Max(startLocal.x, currentLocal.x), Mathf.Max(startLocal.y, currentLocal.y));
+        }
+
+        private void UpdateDragBoxRect()
+        {
+            Rect rect = GetDragLocalRect();
+            dragBox.style.left = rect.xMin;
+            dragBox.style.top = rect.yMin;
+            dragBox.style.width = rect.width;
+            dragBox.style.height = rect.height;
         }
 
         private void ShowBackgroundContextMenu(Vector2 mousePos)
@@ -166,7 +203,8 @@ namespace Less3.Graph.Editor
         public List<LCanvasConnection<N, C>> connections = new();
         public List<LCanvasGroup<G, N>> groups = new();
 
-        public LCanvasNode<N> selectedNode { get; private set; }
+        public List<LCanvasNode<N>> selectedNodes { get; private set; } = new();
+        public LCanvasNode<N> selectedNode => selectedNodes.Count > 0 ? selectedNodes[0] : null;
         public LCanvasConnection<N, C> selectedConnection { get; private set; }
         public LCanvasGroup<G, N> selectedGroup { get; private set; }
         public LCanvasNode<N> newConnectionFromNode;
@@ -188,8 +226,8 @@ namespace Less3.Graph.Editor
         private Type newConnectionType;
         private LCanvasNode<N> hoveredNode;
         private bool _leftDragging;
-        private Vector2 _leftDragStartPos;
-        private Vector2 _leftDragPos;
+        private Vector2 _leftDragStartWorldPos;
+        private Vector2 _leftDragCurrentWorldPos;
         #endregion
 
         #region Events
@@ -331,7 +369,7 @@ namespace Less3.Graph.Editor
             ui.Q("NodeContainer").AddManipulator(new ForceNodeDragManipulator<N, C, G>(
                 node,
                 this,
-                leftClickAction: (n) =>
+                leftClickAction: (n, shiftHeld) =>
                 {
                     if (newConnectionFromNode != null && newConnectionFromNode != n)
                     {
@@ -340,7 +378,7 @@ namespace Less3.Graph.Editor
                         newConnectionFromNode = null;
                     }
                     var castNode = n as LCanvasNode<N>;
-                    SelectNode(castNode);
+                    SelectNode(castNode, shiftHeld);
                 },
                 // * Node right click menu
                 rightClickAction: (n) =>
@@ -349,7 +387,8 @@ namespace Less3.Graph.Editor
                         var nodeType = castNode.data.GetType();
                         var menu = new GenericDropdownMenu();
 
-                        SelectNode(castNode);
+                        if (!selectedNodes.Contains(castNode))
+                            SelectNode(castNode, false);
                         menu.AddDisabledItem("Add Connection", false);
                         if (PossibleConnectionTypes.ContainsKey(nodeType))
                             foreach (var connectionEntry in PossibleConnectionTypes[nodeType])
@@ -491,10 +530,11 @@ namespace Less3.Graph.Editor
             DrawNewConnection();
             DrawGroups();
 
-            selectedNode?.UpdateContent();
+            foreach (var node in selectedNodes)
+                node.UpdateContent();
             selectedConnection?.UpdateContent();
 
-            foreach (var connection in connections.Where(c => c.from == selectedNode || c.to == selectedNode))
+            foreach (var connection in connections.Where(c => selectedNodes.Contains(c.from) || selectedNodes.Contains(c.to)))
                 connection.UpdateContent();
 
             translationContainer.transform.scale = Vector3.one * EditorPrefs.GetFloat(LCanvasPrefs.ZOOM_KEY, LCanvasPrefs.DEFAULT_ZOOM);
@@ -664,15 +704,82 @@ namespace Less3.Graph.Editor
         {
             var node = nodes.Find(n => n.data.Equals(data));
             if (node != null)
-                SelectNode(node);
+                SelectNode(node, false);
         }
 
-        private void SelectNode(LCanvasNode<N> node)
+        private void SelectNode(LCanvasNode<N> node, bool additive)
         {
-            ClearSelection(false);
-            selectedNode = node;
+            if (additive && selectedNodes.Contains(node))
+            {
+                DeselectNode(node);
+                OnSelectionChanged?.Invoke();
+                return;
+            }
+
+            // Clicking a node that's already part of a multi-selection (without Shift) keeps
+            // the whole selection intact, so it can be dragged as a group.
+            if (!additive && selectedNodes.Contains(node) && selectedNodes.Count > 1)
+            {
+                return;
+            }
+
+            if (!additive)
+            {
+                ClearSelection(false);
+            }
+            else
+            {
+                selectedConnection = null;
+                selectedGroup = null;
+            }
+
+            selectedNodes.Add(node);
             node.element.Q("Border").AddToClassList("Selected");
             node.element.BringToFront();
+            OnSelectionChanged?.Invoke();
+        }
+
+        private void DeselectNode(LCanvasNode<N> node)
+        {
+            node.element.Q("Border").RemoveFromClassList("Selected");
+            selectedNodes.Remove(node);
+        }
+
+        private void SelectNodesInRect(Rect boxLocal, bool additive)
+        {
+            if (!additive)
+            {
+                ClearSelection(false);
+            }
+            else
+            {
+                selectedConnection = null;
+                selectedGroup = null;
+            }
+
+            Vector2 worldMin = nodesContainer.LocalToWorld(boxLocal.min);
+            Vector2 worldMax = nodesContainer.LocalToWorld(boxLocal.max);
+            var worldRect = Rect.MinMaxRect(worldMin.x, worldMin.y, worldMax.x, worldMax.y);
+
+            foreach (var node in nodes)
+            {
+                if (!node.bounds.Overlaps(worldRect))
+                    continue;
+
+                if (additive && selectedNodes.Contains(node))
+                {
+                    DeselectNode(node);
+                    continue;
+                }
+
+                if (!selectedNodes.Contains(node))
+                {
+                    selectedNodes.Add(node);
+                    node.element.Q("Border").AddToClassList("Selected");
+                    node.element.BringToFront();
+                }
+            }
+
             OnSelectionChanged?.Invoke();
         }
 
@@ -696,10 +803,11 @@ namespace Less3.Graph.Editor
 
         public void ClearSelection(bool notifySelectionChanged = true)
         {
-            if (selectedNode != null)
+            if (selectedNodes.Count > 0)
             {
-                selectedNode.element.Q("Border").RemoveFromClassList("Selected");
-                selectedNode = null;
+                foreach (var node in selectedNodes)
+                    node.element.Q("Border").RemoveFromClassList("Selected");
+                selectedNodes.Clear();
             }
             if (selectedConnection != null)
             {

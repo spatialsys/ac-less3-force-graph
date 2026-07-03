@@ -85,6 +85,7 @@ namespace Less3.Graph.Editor
         private bool wasInit;
 
         private UnityEditor.Editor graphParametersInspector;
+        private UnityEditor.Editor multiSelectionInspector;
 
         // assigned in the inspector
         public VisualTreeAsset inspectorLayeredUXML;
@@ -353,11 +354,17 @@ namespace Less3.Graph.Editor
         private void OnDestroy()
         {
             DestroyImmediate(graphParametersInspector);
+            DestroyMultiSelectionInspector();
         }
 
         private void OnSelectionChanged()
         {
-            if (canvas.selectedNode != null)
+            if (canvas.selectedNodes.Count > 1)
+            {
+                var objects = canvas.selectedNodes.ConvertAll(n => n.data as Object).ToArray();
+                InspectObjects(objects);
+            }
+            else if (canvas.selectedNode != null)
             {
                 InspectObject(canvas.selectedNode.data);
             }
@@ -387,12 +394,37 @@ namespace Less3.Graph.Editor
 
         private void InspectObject(Object connection)
         {
+            DestroyMultiSelectionInspector();
             selectionInspectorRoot.Clear();
             selectionInspectorRoot.Add(new InspectorElement(connection));
             graphInspectorRoot.style.display = DisplayStyle.None;
             selectionInspectorRoot.style.display = DisplayStyle.Flex;
             var so = new SerializedObject(connection);
             inspectorLabel.text = connection.GetType().Name;
+        }
+
+        private void InspectObjects(Object[] objects)
+        {
+            DestroyMultiSelectionInspector();
+            selectionInspectorRoot.Clear();
+            multiSelectionInspector = UnityEditor.Editor.CreateEditor(objects);
+            selectionInspectorRoot.Add(new InspectorElement(multiSelectionInspector));
+            graphInspectorRoot.style.display = DisplayStyle.None;
+            selectionInspectorRoot.style.display = DisplayStyle.Flex;
+
+            bool sameType = System.Array.TrueForAll(objects, o => o.GetType() == objects[0].GetType());
+            inspectorLabel.text = sameType
+                ? $"{objects.Length} {objects[0].GetType().Name} selected"
+                : $"{objects.Length} selected";
+        }
+
+        private void DestroyMultiSelectionInspector()
+        {
+            if (multiSelectionInspector != null)
+            {
+                DestroyImmediate(multiSelectionInspector);
+                multiSelectionInspector = null;
+            }
         }
 
         private void Update()
