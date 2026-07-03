@@ -152,7 +152,20 @@ namespace Less3.Graph.Editor
                 if (_hoveredGroup != null)
                 {
                     _hoveredGroup.SetHoveredWithNode(false);
-                    _canvas.AddNodeToGroupInternal(_node, _hoveredGroup);
+                    if (_groupStartPositions != null)
+                    {
+                        foreach (var n in _groupStartPositions.Keys)
+                        {
+                            // Skip nodes already belonging to a (different) group - matches
+                            // the single-node behavior, which never re-parents a grouped node.
+                            if (!_canvas.TryGetGroupNodeIsIn(n, out _))
+                                _canvas.AddNodeToGroupInternal(n, _hoveredGroup);
+                        }
+                    }
+                    else
+                    {
+                        _canvas.AddNodeToGroupInternal(_node, _hoveredGroup);
+                    }
                     _hoveredGroup = null;
                 }
             }
