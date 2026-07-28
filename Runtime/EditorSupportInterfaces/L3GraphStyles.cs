@@ -85,6 +85,15 @@ namespace Less3.Graph
         public bool Dashed { get; }
     }
 
+    /// <summary>
+    /// Set the thickness (in pixels) of a connection line in the force graph editor canvas.
+    /// If unused the connection is drawn at the canvas default width.
+    /// </summary>
+    public interface IConnectionWidth
+    {
+        public float ConnectionWidth { get; }
+    }
+
     public interface IConnectionIsDirectional
     {
         public bool IsDirectional { get; }

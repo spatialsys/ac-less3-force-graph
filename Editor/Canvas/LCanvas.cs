@@ -24,6 +24,7 @@ namespace Less3.Graph.Editor
         #region Constants & Assets
         private const string NODE_UXML = "ForceNode";
         private const string GROUP_UXML = "ForceGroup";
+        private const float DEFAULT_CONNECTION_WIDTH = 4f;
 
         private static VisualTreeAsset _nodeUXML;
         private static VisualTreeAsset _groupUXML;
@@ -591,8 +592,10 @@ namespace Less3.Graph.Editor
                 bool isValid = !float.IsNaN(pos1.x) && !float.IsNaN(pos1.y) &&
                                !float.IsNaN(pos2.x) && !float.IsNaN(pos2.y) && pos1 != pos2;
 
+                float width = connection.data is IConnectionWidth widthStyle ? widthStyle.ConnectionWidth : DEFAULT_CONNECTION_WIDTH;
+
                 connectionLine.transform.position = pos1;
-                connectionLine.style.height = isValid ? 4f : 0;
+                connectionLine.style.height = isValid ? width : 0;
                 connectionLine.style.width = isValid ? (pos1 - pos2).magnitude : 0;
 
                 if (isValid)
@@ -633,7 +636,7 @@ namespace Less3.Graph.Editor
             line.style.overflow = Overflow.Visible;
             line.style.flexDirection = FlexDirection.Row;
 
-            line.style.height = 4f;
+            line.style.height = DEFAULT_CONNECTION_WIDTH;
             line.style.transformOrigin = new TransformOrigin(0, Length.Percent(50));
 
             // Make the line element easier to hover/click
