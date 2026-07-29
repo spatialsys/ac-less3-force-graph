@@ -592,7 +592,7 @@ namespace Less3.Graph.Editor
                 bool isValid = !float.IsNaN(pos1.x) && !float.IsNaN(pos1.y) &&
                                !float.IsNaN(pos2.x) && !float.IsNaN(pos2.y) && pos1 != pos2;
 
-                float width = connection.data is IConnectionWidth widthStyle ? widthStyle.ConnectionWidth : DEFAULT_CONNECTION_WIDTH;
+                float width = connection.data is IConnectionStyle style ? style.ConnectionWidth : DEFAULT_CONNECTION_WIDTH;
 
                 connectionLine.transform.position = pos1;
                 connectionLine.style.height = isValid ? width : 0;

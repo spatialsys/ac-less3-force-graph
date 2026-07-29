@@ -77,20 +77,12 @@ namespace Less3.Graph
     }
 
     /// <summary>
-    /// Set the color of a connection in the force graph editor canvas
+    /// Set the appearance of a connection in the force graph editor canvas.
     /// </summary>
     public interface IConnectionStyle
     {
         public Color ConnectionColor { get; }
         public bool Dashed { get; }
-    }
-
-    /// <summary>
-    /// Set the thickness (in pixels) of a connection line in the force graph editor canvas.
-    /// If unused the connection is drawn at the canvas default width.
-    /// </summary>
-    public interface IConnectionWidth
-    {
         public float ConnectionWidth { get; }
     }
 
