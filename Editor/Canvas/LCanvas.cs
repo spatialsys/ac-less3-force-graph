@@ -154,6 +154,16 @@ namespace Less3.Graph.Editor
                     AddNullNodeInternal(nodeType, nodesContainer.WorldToLocal(mousePos)));
             });
 
+            if (CanPaste != null && CanPaste())
+            {
+                menu.AddItem("Paste", false, () =>
+                    OnPasteRequestedInternally?.Invoke(nodesContainer.WorldToLocal(mousePos)));
+            }
+            else
+            {
+                menu.AddDisabledItem("Paste", false);
+            }
+
             if (PossibleGroupTypes.Count > 0)
             {
                 menu.AddSeparator("");
@@ -245,11 +255,18 @@ namespace Less3.Graph.Editor
         public Action<LCanvasNode<N>> OnNodeDuplicatedInternally;
         public Action<LCanvasConnection<N, C>> OnConnectionDeletedInternally;
         public Action<N> OnNodeDoubleClickedInternally;
+        public Action<List<LCanvasNode<N>>> OnNodesCopiedInternally;
+        public Action<Vector2> OnPasteRequestedInternally;
+
+        // Raised by whoever handled the paste, once the copies exist, so listeners get the new data
+        // rather than having to guess at it from the tail of the graph's node list.
+        public Action<List<N>> OnNodesPastedInternally;
         #endregion
 
         #region Configuration
         public Dictionary<Type, List<(string, Type)>> PossibleConnectionTypes = new();
         public List<(string, Type)> PossibleGroupTypes = new();
+        public Func<bool> CanPaste;
         #endregion
 
         #region Node Operations
@@ -423,21 +440,16 @@ namespace Less3.Graph.Editor
                             }
                         }
 
+                        // Copy, Cut and Duplicate all act on the whole selection, which the
+                        // force-select above guarantees holds at least the node just clicked.
                         menu.AddSeparator("");
-                        menu.AddItem("Duplicate", false, () =>
-                        {
-                            DuplicateNodeInternal(castNode);
-                        });
-                        menu.AddItem("Delete", false, () =>
-                        {
-                            DeleteNodeInternal(castNode);
-                        });
-
+                        menu.AddItem("Copy", false, () => CopySelectionInternal(false));
+                        menu.AddItem("Cut", false, () => CopySelectionInternal(true));
+                        menu.AddItem("Duplicate", false, () => DuplicateNodeInternal(castNode));
+                        menu.AddItem("Delete", false, () => DeleteNodeInternal(castNode));
                         menu.DropDown(n.element.worldBound, n.element, false);
-
                     },
-                enterAction: (n) =>
-                { hoveredNode = n; },
+                enterAction: (n) => hoveredNode = n,
                 exitAction: (n) => { if (hoveredNode == n) hoveredNode = null; }
                 )
             );
@@ -465,6 +477,23 @@ namespace Less3.Graph.Editor
         private void DuplicateNodeInternal(LCanvasNode<N> node)
         {
             OnNodeDuplicatedInternally?.Invoke(node);
+        }
+
+        private void CopySelectionInternal(bool cut)
+        {
+            if (selectedNodes.Count == 0)
+                return;
+
+            // A copy of the list either way: the handler is free to hold onto it, and the delete
+            // below empties the selection as it goes.
+            List<LCanvasNode<N>> taken = new(selectedNodes);
+            OnNodesCopiedInternally?.Invoke(taken);
+
+            if (!cut)
+                return;
+
+            for (int i = 0; i < taken.Count; i++)
+                DeleteNodeInternal(taken[i]);
         }
 
         private void DeleteGroupInternal(LCanvasGroup<G, N> group)

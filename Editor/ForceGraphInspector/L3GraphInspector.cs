@@ -228,6 +228,9 @@ namespace Less3.Graph.Editor
                 var n = (target as L3Graph).DuplicateNode(node.data);
                 canvas.InitNodeExternal(n, n.position);
             };
+            canvas.OnNodesCopiedInternally += CopyToClipboard;
+            canvas.OnPasteRequestedInternally += PasteFromClipboard;
+            canvas.CanPaste = () => _clipboardNodes.Count > 0;
             canvas.OnConnectionCreatedInternally += (connection, type) =>
             {
                 var asset = (target as L3Graph).CreateConnection(connection.from.data, connection.to.data, type);
@@ -448,6 +451,142 @@ namespace Less3.Graph.Editor
                 multiSelectionInspector = null;
             }
         }
+
+        #region Clipboard
+
+        // Detached copies rather than serialized text: node bodies routinely hold
+        // [SerializeReference] fields, which Instantiate deep-copies correctly and a JSON round trip
+        // mangles. Taking the copy up front is also what makes Cut safe -- the clipboard never
+        // points at objects the cut then destroys -- and lets one copy be pasted repeatedly.
+        // Lives until a domain reload, so it crosses windows and graphs but not editor sessions.
+        private static readonly List<L3GraphNode> _clipboardNodes = new List<L3GraphNode>();
+        private static readonly List<L3GraphConnection> _clipboardConnections = new List<L3GraphConnection>();
+
+        // The statics go anyway, so the copies have to go with them -- DontSave objects nothing
+        // references are what Unity complains about having to clean up on quit.
+        [InitializeOnLoadMethod]
+        private static void ClearClipboardOnReload()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload += ClearClipboard;
+        }
+
+        private static void CopyToClipboard(List<LCanvasNode<L3GraphNode>> nodes)
+        {
+            if (nodes.Count == 0)
+                return;
+
+            L3Graph source = nodes[0].data.graph;
+            ClearClipboard();
+
+            Dictionary<L3GraphNode, L3GraphNode> copies = new Dictionary<L3GraphNode, L3GraphNode>();
+            foreach (LCanvasNode<L3GraphNode> node in nodes)
+            {
+                L3GraphNode copy = Detach(node.data);
+                copies[node.data] = copy;
+                _clipboardNodes.Add(copy);
+            }
+
+            // Only an edge with both ends in the selection: one reaching outside it has nothing to
+            // land on at the other end.
+            foreach (L3GraphConnection connection in source.connections)
+            {
+                if (!copies.TryGetValue(connection.from, out L3GraphNode from))
+                    continue;
+                if (!copies.TryGetValue(connection.to, out L3GraphNode to))
+                    continue;
+
+                L3GraphConnection copy = Detach(connection);
+                copy.from = from;
+                copy.to = to;
+                _clipboardConnections.Add(copy);
+            }
+        }
+
+        private void PasteFromClipboard(Vector2 position)
+        {
+            if (_clipboardNodes.Count == 0)
+                return;
+
+            L3Graph graph = target as L3Graph;
+            Vector2 offset = position - ClipboardCenter();
+
+            Dictionary<L3GraphNode, L3GraphNode> pasted = new Dictionary<L3GraphNode, L3GraphNode>();
+            List<L3GraphNode> added = new List<L3GraphNode>();
+
+            foreach (L3GraphNode source in _clipboardNodes)
+            {
+                L3GraphNode node = Instantiate(source);
+                node.name = source.name;
+                node.position = source.position + offset;
+                AssetDatabase.AddObjectToAsset(node, graph);
+
+                // The copy arrives with a null graph -- L3GraphNode.graph is an auto-property and so
+                // is never serialized -- which is what keeps SetGraph's write-once guard happy.
+                node.SetGraph(graph);
+                graph.nodes.Add(node);
+
+                pasted[source] = node;
+                added.Add(node);
+                canvas.InitNodeExternal(node, node.position);
+            }
+
+            foreach (L3GraphConnection source in _clipboardConnections)
+            {
+                L3GraphNode from = pasted[source.from];
+                L3GraphNode to = pasted[source.to];
+
+                // Pasting into another graph can hit rules the origin graph did not have, and the
+                // nodes are worth keeping even when an edge between them is not allowed here.
+                if (!graph.ValidateConnectionRequest(from, to, source.GetType()))
+                    continue;
+
+                L3GraphConnection connection = Instantiate(source);
+                connection.name = source.name;
+                connection.from = from;
+                connection.to = to;
+                AssetDatabase.AddObjectToAsset(connection, graph);
+                graph.connections.Add(connection);
+
+                canvas.InitConnectionExternal(from, to, connection);
+            }
+
+            EditorUtility.SetDirty(graph);
+            canvas.OnNodesPastedInternally?.Invoke(added);
+        }
+
+        private static T Detach<T>(T source) where T : ScriptableObject
+        {
+            T copy = Instantiate(source);
+            copy.name = source.name;
+            copy.hideFlags = HideFlags.HideAndDontSave;
+            return copy;
+        }
+
+        private static Vector2 ClipboardCenter()
+        {
+            Vector2 sum = Vector2.zero;
+            foreach (L3GraphNode node in _clipboardNodes)
+            {
+                sum += node.position;
+            }
+            return sum / _clipboardNodes.Count;
+        }
+
+        private static void ClearClipboard()
+        {
+            foreach (L3GraphConnection connection in _clipboardConnections)
+            {
+                DestroyImmediate(connection);
+            }
+            foreach (L3GraphNode node in _clipboardNodes)
+            {
+                DestroyImmediate(node);
+            }
+            _clipboardConnections.Clear();
+            _clipboardNodes.Clear();
+        }
+
+        #endregion
 
         private void Update()
         {
