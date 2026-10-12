@@ -12,5 +12,14 @@ namespace Less3.Graph
         public L3GraphNode to;
 
         public static Color defaultColor = new Color(.7f, .7f, .7f, 1f);
+
+        public L3GraphNode GetOtherNode(L3GraphNode node)
+        {
+            if (from == node)
+                return to;
+            if (to == node)
+                return from;
+            return null;
+        }
     }
 }
