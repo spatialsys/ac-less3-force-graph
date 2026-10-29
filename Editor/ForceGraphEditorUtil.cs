@@ -50,6 +50,7 @@ namespace Less3.Graph.Editor
                 return;
             }
             graph.nodes.Remove(node);
+            RemoveNodeFromAllGroups(graph, node);
             ScriptableObject.DestroyImmediate(node, true);
             EditorUtility.SetDirty(graph);
         }
