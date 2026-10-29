@@ -19,7 +19,8 @@ namespace Less3.Graph
 
         private void OnEnable()
         {
-            //Validation. This excists because Nodes didnt have a graph reference before. It should be unnecessary for new graphs.
+            // The graph back-reference is not serialized, so every load re-links it here. That changes
+            // nothing on disk, so only dropping a null entry may dirty the asset.
             for (int i = nodes.Count - 1; i >= 0; i--)
             {
                 L3GraphNode n = nodes[i];
@@ -35,10 +36,6 @@ namespace Less3.Graph
                 {
                     n.SetGraph(this);
                 }
-#if UNITY_EDITOR
-                UnityEditor.EditorUtility.SetDirty(n);
-                UnityEditor.EditorUtility.SetDirty(this);
-#endif
             }
 
             for (int i = groups.Count - 1; i >= 0; i--)
@@ -55,12 +52,6 @@ namespace Less3.Graph
                 if (g.graph == null)
                 {
                     g.SetGraph(this);
-
-#if UNITY_EDITOR
-
-                    UnityEditor.EditorUtility.SetDirty(g);
-                    UnityEditor.EditorUtility.SetDirty(this);
-#endif
                 }
             }
         }

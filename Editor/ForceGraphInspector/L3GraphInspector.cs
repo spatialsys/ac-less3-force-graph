@@ -309,7 +309,10 @@ namespace Less3.Graph.Editor
             foreach (var node in (target as L3Graph).nodes)
             {
                 if (node.position == Vector2.zero)
+                {
                     node.position = new Vector2(UnityEngine.Random.Range(-200, 200), UnityEngine.Random.Range(-200, 200));
+                    EditorUtility.SetDirty(target);
+                }
                 canvas.InitNodeExternal(node, node.position);
             }
 
@@ -477,6 +480,7 @@ namespace Less3.Graph.Editor
                     if (Mathf.Approximately(group.data.position.x, group.position.x) && Mathf.Approximately(group.data.position.y, group.position.y))
                         continue;
                     group.data.position = group.position;
+                    UnityEditor.EditorUtility.SetDirty(target);
                 }
 
                 if (inspectorOverlay != null && inspectorOverlay.panel != null)
